@@ -1,5 +1,5 @@
 const Order = require('../model/Order');
-const User = require('../model/user');
+const User = require('../model/User');
 const Product = require('../model/Products');
 
 const getAdminStats = async (req, res) => {
@@ -9,16 +9,23 @@ const getAdminStats = async (req, res) => {
     const totalProducts = await Product.countDocuments({});
 
     const orders = await Order.find({});
-    const totalRevenueData = orders.reduce((acc, order) => acc + (order.totalPrice || 0), 0);
+
+    const totalRevenueData = orders.reduce(
+      (acc, order) => acc + (order.totalAmount || 0),
+      0
+    );
 
     res.json({
       totalUsers,
       totalOrders,
       totalProducts,
-      totalRevenueData
+      totalRevenueData,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching admin stats', error: error.message });
+    res.status(500).json({
+      message: 'Error fetching admin stats',
+      error: error.message,
+    });
   }
 };
 
