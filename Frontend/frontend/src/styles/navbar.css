@@ -1,0 +1,238 @@
+/* =========================
+   NAVBAR
+========================= */
+
+.navbar {
+  height: 115px;
+
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+  padding: 0 70px;
+
+  background: #09090b;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+
+  position: sticky;
+
+  top: 0;
+
+  z-index: 1000;
+}
+
+/* =========================
+   LOGO
+========================= */
+
+.navbar-logo {
+  display: flex;
+  align-items: center;
+}
+
+.brand-link {
+  display: inline-flex;
+
+  align-items: center;
+
+  gap: 12px;
+
+  color: #ffffff;
+
+  text-decoration: none;
+
+  font-size: 2.1rem;
+
+  font-weight: 700;
+
+  letter-spacing: -0.05em;
+}
+
+.brand-icon {
+  width: 42px;
+  height: 42px;
+
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 9px;
+
+  background: linear-gradient(
+    135deg,
+    #f59e0b,
+    #f97316
+  );
+
+  box-shadow:
+    0 0 18px rgba(249, 115, 22, 0.5);
+
+  font-size: 1.35rem;
+}
+
+.brand-name {
+  line-height: 1;
+}
+
+.brand-dot {
+  color: #f97316;
+
+  font-size: 2.6rem;
+
+  margin-left: -7px;
+
+  line-height: 1;
+}
+
+/* =========================
+   NAV LINKS
+========================= */
+
+.navbar-links {
+  display: flex;
+
+  align-items: center;
+
+  gap: 38px;
+
+  margin: 0;
+
+  padding: 0;
+
+  list-style: none;
+}
+
+.navbar-links li {
+  list-style: none;
+}
+
+.navbar-links a {
+  position: relative;
+
+  display: inline-block;
+
+  color: #f5f5f5;
+
+  font-size: 1.1rem;
+
+  font-weight: 500;
+
+  text-decoration: none;
+
+  transition: color 0.2s ease;
+}
+
+.navbar-links a:hover {
+  color: #ffffff;
+}
+
+/* Orange underline */
+
+.navbar-links a::after {
+  content: '';
+
+  position: absolute;
+
+  left: 0;
+
+  bottom: -10px;
+
+  width: 0;
+
+  height: 3px;
+
+  background: #f97316;
+
+  border-radius: 3px;
+
+  transition: width 0.25s ease;
+}
+
+.navbar-links a:hover::after {
+  width: 100%;
+}
+
+/* =========================
+   CART
+========================= */
+
+.cart-link {
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  padding: 0;
+
+  border: none;
+
+  border-radius: 0;
+
+  background: transparent;
+}
+
+/* =========================
+   LOGOUT
+========================= */
+
+.btn-logout {
+  background: transparent;
+
+  color: #ffffff;
+
+  border: 1px solid rgba(255, 255, 255, 0.2);
+
+  border-radius: 8px;
+
+  padding: 8px 12px;
+
+  font: inherit;
+
+  cursor: pointer;
+}
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 768px) {
+  .navbar {
+    height: auto;
+
+    min-height: 90px;
+
+    flex-direction: column;
+
+    gap: 18px;
+
+    padding: 18px 20px;
+  }
+
+  .brand-link {
+    font-size: 1.7rem;
+  }
+
+  .brand-icon {
+    width: 36px;
+    height: 36px;
+
+    font-size: 1.15rem;
+  }
+
+  .navbar-links {
+    gap: 20px;
+
+    flex-wrap: wrap;
+
+    justify-content: center;
+  }
+
+  .navbar-links a {
+    font-size: 1rem;
+  }
+}

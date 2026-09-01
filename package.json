@@ -1,0 +1,18 @@
+{
+  "name": "shopnest-full-stack",
+  "version": "1.0.0",
+  "author": "Sachin Kumar",
+  "description": "Full-Stack MERN E-Commerce App",
+  "scripts": {
+    "install-all": "npm install && cd Backend && npm install && cd ../Frontend/frontend && npm install",
+    "dev:server": "npm --prefix Backend run dev",
+    "dev:client": "npm --prefix Frontend/frontend run dev",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "build": "npm --prefix Frontend/frontend run build",
+    "start": "npm --prefix Backend start",
+    "seed": "npm --prefix Backend run seed"
+  },
+  "dependencies": {
+    "concurrently": "^10.0.4"
+  }
+}
