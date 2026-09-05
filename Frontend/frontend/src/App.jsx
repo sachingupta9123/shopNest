@@ -10,7 +10,7 @@ import ReturnPolicy from "./pages/returnpolicy";
 import Register from "./pages/Register";
 import ProductDetail from "./pages/ProductDetail";
 import Login from "./pages/Login";
-import VerifyOTP from "./pages/VerifyOTP";
+import VerifyOTP from "./pages/VerifyOtp";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import OrderSuccessful from "./pages/OrderSuccessful";
