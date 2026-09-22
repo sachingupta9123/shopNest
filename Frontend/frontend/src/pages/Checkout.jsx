@@ -2,6 +2,7 @@ import React, { useState, useContext } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { AuthContext } from "../context/AuthContext";
+
 import { clearCart } from "../redux/cartSlice";
 import {
   clearBuyNow,
@@ -18,11 +19,13 @@ const Checkout = () => {
 
   const { user } = useContext(AuthContext);
 
-  const cartItems = useSelector(
-    (state) => state.cart.cartItems
-  );
+  const cartItems = useSelector((state) => state.cart.cartItems);
   const buyNowItem = useSelector((state) => state.checkout.buyNowItem);
-  const isBuyNow = new URLSearchParams(location.search).get("mode") === "buy-now" && Boolean(buyNowItem);
+
+  const isBuyNow =
+    new URLSearchParams(location.search).get("mode") === "buy-now" &&
+    Boolean(buyNowItem);
+
   const checkoutItems = isBuyNow ? [buyNowItem] : cartItems;
 
   const [loading, setLoading] = useState(false);
@@ -38,8 +41,7 @@ const Checkout = () => {
 
   // Calculate Total
   const totalAmount = checkoutItems.reduce(
-    (total, item) =>
-      total + Number(item.price) * item.quantity,
+    (total, item) => total + Number(item.price) * item.quantity,
     0
   );
 
@@ -51,13 +53,14 @@ const Checkout = () => {
     });
   };
 
-  // Place Order
+  // Place Order with Payment
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
 
     // Check Login
     if (!user || !user.token) {
       alert("Please login before placing an order.");
+
       navigate("/login", {
         state: {
           from: {
@@ -66,6 +69,7 @@ const Checkout = () => {
           },
         },
       });
+
       return;
     }
 
@@ -79,14 +83,105 @@ const Checkout = () => {
     try {
       setLoading(true);
 
-      // Convert Cart Items to Backend Format
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${user.token}`,
+      };
+
+      // 1. Create Payment Order
+      const paymentResponse = await fetch("/api/payment/order", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          amount: totalAmount,
+        }),
+      });
+
+      const paymentData = await paymentResponse.json();
+
+      if (!paymentResponse.ok || !paymentData.success) {
+        throw new Error(
+          paymentData.message || "Payment order creation failed"
+        );
+      }
+
+      let paymentDetails;
+
+      // 2. Demo Payment
+      if (paymentData.demo === true) {
+        paymentDetails = {
+          razorpay_payment_id: paymentData.paymentId,
+        };
+      } else {
+        // 3. Razorpay Test Payment
+        if (!window.Razorpay) {
+          throw new Error(
+            "Razorpay script is not loaded. Please check index.html."
+          );
+        }
+
+        paymentDetails = await new Promise((resolve, reject) => {
+          const options = {
+            key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+
+            amount: paymentData.amount,
+            currency: paymentData.currency,
+
+            name: "ShopNest",
+            description: "ShopNest Order Payment",
+
+            order_id: paymentData.id,
+
+            handler: (response) => {
+              resolve(response);
+            },
+
+            modal: {
+              ondismiss: () => {
+                reject(new Error("Payment cancelled."));
+              },
+            },
+
+            theme: {
+              color: "#3399cc",
+            },
+          };
+
+          const razorpay = new window.Razorpay(options);
+
+          razorpay.on("payment.failed", () => {
+            reject(new Error("Payment failed."));
+          });
+
+          razorpay.open();
+        });
+      }
+
+      // 4. Verify Payment
+      const verifyResponse = await fetch("/api/payment/verify", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(paymentDetails),
+      });
+
+      const verifyData = await verifyResponse.json();
+
+      if (!verifyResponse.ok || !verifyData.success) {
+        throw new Error(
+          verifyData.message || "Payment verification failed"
+        );
+      }
+
+      // 5. Convert Items into Backend Format
       const orderItems = checkoutItems.map((item) => ({
         product: item._id,
         qty: item.quantity,
       }));
 
+      // 6. Prepare Order Data
       const orderData = {
         items: orderItems,
+
         address: {
           fullName: formData.fullName,
           street: formData.street,
@@ -95,73 +190,59 @@ const Checkout = () => {
           postalCode: formData.postalCode,
           country: formData.country,
         },
+
+        paymentId:
+          verifyData.paymentId ||
+          paymentDetails.razorpay_payment_id,
+
+        paymentStatus: "paid",
       };
 
-      const response = await fetch("/api/orders", {
+      // 7. Create Actual Order
+      const orderResponse = await fetch("/api/orders", {
         method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-
-          Authorization: `Bearer ${user.token}`,
-        },
-
+        headers,
         body: JSON.stringify(orderData),
       });
 
-      /*
-        SAFE RESPONSE HANDLING
+      const text = await orderResponse.text();
 
-        This prevents:
-        Unexpected end of JSON input
-      */
-
-      const text = await response.text();
-
-      let data = {};
+      let orderResult = {};
 
       if (text) {
         try {
-          data = JSON.parse(text);
+          orderResult = JSON.parse(text);
         } catch (error) {
           console.error("Invalid JSON from backend:", error);
         }
       }
 
-      // Backend Error
-      if (!response.ok) {
-        alert(
-          data.message ||
-            `Order failed. Status: ${response.status}`
+      if (!orderResponse.ok) {
+        throw new Error(
+          orderResult.message ||
+            `Order creation failed. Status: ${orderResponse.status}`
         );
-
-        return;
       }
 
-      console.log("Order Successful:", data);
-
+      // 8. Clear Cart
       if (isBuyNow) {
         dispatch(clearBuyNow());
       } else {
         dispatch(clearCart());
       }
 
-      // Navigate to Success Page
+      // 9. Navigate to Success Page
       navigate("/order-success", {
         state: {
-          order: data.order,
-          totalAmount: data.order?.totalAmount ?? totalAmount,
+          order: orderResult.order,
+          totalAmount:
+            orderResult.order?.totalAmount ?? totalAmount,
         },
       });
-
     } catch (error) {
-      console.error("Order Error:", error);
+      console.error("Checkout Error:", error);
 
-      alert(
-        error.message ||
-          "Something went wrong while placing the order."
-      );
-
+      alert(error.message || "Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -171,9 +252,7 @@ const Checkout = () => {
   if (checkoutItems.length === 0) {
     return (
       <div className="checkout-page">
-
         <div className="empty-checkout">
-
           <h1>Your Cart is Empty</h1>
 
           <p>
@@ -186,47 +265,43 @@ const Checkout = () => {
           >
             Continue Shopping
           </Link>
-
         </div>
-
       </div>
     );
   }
 
   return (
     <div className="checkout-page">
-
       <div className="checkout-container">
 
         {/* Header */}
-
         <div className="checkout-header">
-
           <Link
-            to={isBuyNow ? `/product/${buyNowItem._id}` : "/cart"}
+            to={
+              isBuyNow
+                ? `/product/${buyNowItem._id}`
+                : "/cart"
+            }
             className="back-to-cart"
           >
-            {isBuyNow ? "← Back to Product" : "← Back to Cart"}
+            {isBuyNow
+              ? "← Back to Product"
+              : "← Back to Cart"}
           </Link>
 
           <h1>Checkout</h1>
-
         </div>
 
         <div className="checkout-content">
 
           {/* Checkout Form */}
-
           <div className="checkout-form-box">
-
             <h2>Shipping Information</h2>
 
             <form onSubmit={handlePlaceOrder}>
 
               {/* Full Name */}
-
               <div className="form-group">
-
                 <label>Full Name</label>
 
                 <input
@@ -237,14 +312,10 @@ const Checkout = () => {
                   onChange={handleChange}
                   required
                 />
-
               </div>
 
-
-              {/* Address */}
-
+              {/* Street Address */}
               <div className="form-group">
-
                 <label>Street Address</label>
 
                 <textarea
@@ -254,16 +325,12 @@ const Checkout = () => {
                   onChange={handleChange}
                   required
                 />
-
               </div>
 
-
               {/* City + State */}
-
               <div className="form-row">
 
                 <div className="form-group">
-
                   <label>City</label>
 
                   <input
@@ -274,12 +341,9 @@ const Checkout = () => {
                     onChange={handleChange}
                     required
                   />
-
                 </div>
 
-
                 <div className="form-group">
-
                   <label>State</label>
 
                   <input
@@ -290,18 +354,14 @@ const Checkout = () => {
                     onChange={handleChange}
                     required
                   />
-
                 </div>
 
               </div>
 
-
               {/* Pincode + Country */}
-
               <div className="form-row">
 
                 <div className="form-group">
-
                   <label>Pincode</label>
 
                   <input
@@ -312,12 +372,9 @@ const Checkout = () => {
                     onChange={handleChange}
                     required
                   />
-
                 </div>
 
-
                 <div className="form-group">
-
                   <label>Country</label>
 
                   <input
@@ -328,16 +385,12 @@ const Checkout = () => {
                     onChange={handleChange}
                     required
                   />
-
                 </div>
 
               </div>
 
-
               {/* Demo Payment */}
-
               <div className="demo-payment">
-
                 <h3>Demo Payment</h3>
 
                 <p>
@@ -347,148 +400,135 @@ const Checkout = () => {
                 <p>
                   Amount: ₹{totalAmount.toFixed(2)}
                 </p>
-
               </div>
 
-
-              {/* Button */}
-
-              <button type="submit" className="place-order-btn" disabled={loading} >
-                     {loading ? "Processing Order..." : `Place Order • ₹${totalAmount}`}
-               </button>
+              {/* Place Order Button */}
+              <button
+                type="submit"
+                className="place-order-btn"
+                disabled={loading}
+              >
+                {loading
+                  ? "Processing Order..."
+                  : `Place Order • ₹${totalAmount.toFixed(2)}`}
+              </button>
 
             </form>
-
           </div>
 
-
           {/* Order Summary */}
-
           <div className="checkout-summary">
-
             <h2>Order Summary</h2>
 
-
             {/* Products */}
-
             <div className="checkout-products">
-
               {checkoutItems.map((item) => (
-
                 <div
                   className="checkout-product"
                   key={item._id}
                 >
-
                   <img
                     src={item.imageUrl}
                     alt={item.name}
                   />
 
                   <div className="checkout-product-info">
-
                     <h3>{item.name}</h3>
 
+                    {/* Quantity Control */}
                     {isBuyNow ? (
                       <div className="checkout-quantity-control">
+
                         <button
                           type="button"
-                          onClick={() => dispatch(decreaseBuyNowQuantity())}
+                          onClick={() =>
+                            dispatch(decreaseBuyNowQuantity())
+                          }
                           disabled={item.quantity <= 1}
                           aria-label="Decrease quantity"
                         >
                           −
                         </button>
-                        <span>Quantity: {item.quantity}</span>
+
+                        <span>
+                          Quantity: {item.quantity}
+                        </span>
+
                         <button
                           type="button"
-                          onClick={() => dispatch(increaseBuyNowQuantity())}
-                          disabled={item.quantity >= item.stock}
+                          onClick={() =>
+                            dispatch(increaseBuyNowQuantity())
+                          }
+                          disabled={
+                            item.quantity >= item.stock
+                          }
                           aria-label="Increase quantity"
                         >
                           +
                         </button>
+
                       </div>
                     ) : (
-                      <p>Quantity: {item.quantity}</p>
+                      <p>
+                        Quantity: {item.quantity}
+                      </p>
                     )}
 
                     <span>
                       ₹
                       {(
-                        Number(item.price) *
-                        item.quantity
+                        Number(item.price) * item.quantity
                       ).toFixed(2)}
                     </span>
-
                   </div>
-
                 </div>
-
               ))}
-
             </div>
-
 
             <hr />
 
-
-            {/* Summary */}
-
+            {/* Items Summary */}
             <div className="checkout-summary-row">
-
               <span>Items</span>
 
               <span>
                 {checkoutItems.reduce(
-                  (total, item) =>
-                    total + item.quantity,
+                  (total, item) => total + item.quantity,
                   0
                 )}
               </span>
-
             </div>
 
-
+            {/* Subtotal */}
             <div className="checkout-summary-row">
-
               <span>Subtotal</span>
 
               <span>
                 ₹{totalAmount.toFixed(2)}
               </span>
-
             </div>
 
-
+            {/* Shipping */}
             <div className="checkout-summary-row">
-
               <span>Shipping</span>
 
               <span>Free</span>
-
             </div>
-
 
             <hr />
 
-
+            {/* Total */}
             <div className="checkout-total">
-
               <span>Total</span>
 
               <span>
                 ₹{totalAmount.toFixed(2)}
               </span>
-
             </div>
 
           </div>
-
         </div>
-
       </div>
-
     </div>
   );
 };

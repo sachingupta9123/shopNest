@@ -265,3 +265,22 @@
   .order-product img, .order-product-placeholder { width: 52px; height: 52px; }
   .order-product strong { grid-column: 2; }
 }
+
+
+/* Cancel Order Button */
+
+.cancel-order-button {
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: #dc2626;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.cancel-order-button:hover {
+  background: #b91c1c;
+}

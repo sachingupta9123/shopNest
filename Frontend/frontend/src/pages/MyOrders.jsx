@@ -76,6 +76,54 @@ const MyOrders = () => {
     return () => controller.abort();
   }, [logout, navigate, user]);
 
+
+
+  const handleCancelOrder = async (orderId) => {
+  const confirmed = window.confirm(
+    "Are you sure you want to cancel this order?"
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const response = await fetch(
+      `/api/orders/${orderId}/cancel`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      }
+    );
+
+    const data = await parseJsonResponse(response);
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || "Unable to cancel order."
+      );
+    }
+
+    // Update order status in UI
+    setOrders((previousOrders) =>
+      previousOrders.map((order) =>
+        order._id === orderId
+          ? {
+              ...order,
+              status: "cancelled",
+            }
+          : order
+      )
+    );
+
+    alert("Order cancelled successfully.");
+  } catch (error) {
+    alert(
+      error.message || "Something went wrong."
+    );
+  }
+};
+
   if (!user?.token) {
     return null;
   }
@@ -148,6 +196,16 @@ const MyOrders = () => {
                 <footer className="order-card-footer">
                   <span>Payment ID: {order.paymentId || 'Not available'}</span>
                   <strong>Total: {formatAmount(order.totalAmount)}</strong>
+
+                  {["pending", "processing"].includes(order.status) && (
+                       <button
+                         type="button"
+                         className="cancel-order-button"
+                         onClick={() => handleCancelOrder(order._id)}
+                       >
+                         Cancel Order
+                       </button>
+                     )}
                 </footer>
               </article>
             ))}

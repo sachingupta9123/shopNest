@@ -7,6 +7,7 @@ const {
   myOrders,
   getOrders,
   updateOrderStatus,
+  cancelOrder,
 } = require('../controllers/orderController');
 
 const {
@@ -53,6 +54,15 @@ router.put(
   protect,
   admin,
   updateOrderStatus
+);
+
+
+// User - Cancel Own Order
+
+router.patch(
+  "/:id/cancel",
+  protect,
+  cancelOrder
 );
 
 
